@@ -1,0 +1,13 @@
+[package]
+name = "brandonkong/placement-system"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
+knit = "sleitnick/knit@1.5.1"
+promise = "evaera/promise@4.0.0"
+janitor = "howmanysmall/janitor@1.15.2"
+rodux = "roblox/rodux@3.0.0"
+component = "sleitnick/component@2.4.6"
+maid = "flamenco687/maid@3.2.2"
