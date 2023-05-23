@@ -1,5 +1,10 @@
-local Component = require(game:GetService("ReplicatedStorage").Packages.component)
-local Maid = require(game:GetService("ReplicatedStorage").Packages.maid)
+local rs = game:GetService("ReplicatedStorage")
+local Component = require(rs.Packages.component)
+local Maid = require(rs.Packages.maid)
+
+local knit = require(rs.Packages.knit)
+
+local Items = require(rs.Shared.Modules.Items)
 
 local Plot = Component.new({
     Tag = 'Plot',
@@ -37,25 +42,128 @@ function Plot:isOwnedBy(player)
 end
 
 
-function Plot:PlaceObject(object: Instance, configs: table)
-    local tile = configs.tile
+function Plot:PlaceObject(object: Instance, props: table, path: string)
+
+    local ObjectService = knit.GetService("ObjectService")
+
+    if (not ObjectService) then
+        warn("ObjectService not found")
+        return false
+    end
+    
+    local tile = props.tile
     local tileNum = tonumber(tile.Name)
 
     if (not tileNum) then
-        return
+        return false
     end
+
+    local objectFromPath = ObjectService:TreePathToItemObject(path)
+
+    if (not objectFromPath) then
+        warn('Object not found in index')
+        return false
+    end
+
+    -- if the tile is already occupied, check if stacking is allowed
 
     if (self.tiles[tileNum]) then
-        return
+        local stacking = objectFromPath.special.stacking
+
+        if (stacking and stacking.allowed) then
+            local allowedModels = stacking.allowedModels
+            local max = stacking.max
+
+
+            for _, stackedObject in pairs(self.tiles[tileNum]) do
+
+                if (table.find(allowedModels, stackedObject.Name)) then
+                    if (max and stackedObject.Stacked) then
+                        return false
+                    end
+                else
+                    return false
+                end
+
+                -- check if the connection points match
+
+
+                local b = object:Clone()
+
+                local yFactor = b.PrimaryPart.Size.Y/2 + tile.Size.Y/2
+
+                if (b.PrimaryPart.Size.Y < 1) then
+                    yFactor = b.PrimaryPart.Size.Y * 1.5
+                end
+
+                local objCFrame = (tile.CFrame + Vector3.new(0, yFactor, 0)) * CFrame.Angles(0, math.rad(props.rotation*90), 0)
+                b:SetPrimaryPartCFrame(objCFrame)
+
+                b.PrimaryPart.Anchored = true
+
+                local stackedObjConnectionPoints = self.tiles[tileNum][1].Instance.PrimaryPart:FindFirstChild(path)
+                local objectConnectionPoints = b.PrimaryPart:FindFirstChild(stackedObject.Name)
+
+                if (not stackedObjConnectionPoints or not objectConnectionPoints) then
+                    return false
+                end
+
+                local lenStack = #stackedObjConnectionPoints:GetChildren()
+                local lenObj = #objectConnectionPoints:GetChildren()
+
+                if (lenStack ~= lenObj) then
+                    print(lenStack, lenObj)
+                    return false
+                end
+                
+                local connectionPoints = {}
+
+                for i, v in ipairs(stackedObjConnectionPoints:GetChildren()) do
+                    for i2, v2 in ipairs(objectConnectionPoints:GetChildren()) do
+                        print((v.Position - v2.Position).Magnitude)
+                        if ((v.Position - v2.Position).Magnitude < 0.25) then
+                            table.insert(connectionPoints, v)
+                        end
+                    end
+                end
+
+                if (#connectionPoints ~= lenStack) then
+                    return false
+                end
+
+            end
+
+            -- if the object is allowed to be stacked, add it to the stack
+        else
+            return false
+        end
+
+        
     end
 
-    self.tiles[tileNum] = {object}
+    local clonedObj = object:Clone()
 
-    object.Parent = self.Instance.Models
+    self.tiles[tileNum] = self.tiles[tileNum] or {}
+    table.insert(self.tiles[tileNum], {Name = path, Instance = clonedObj, Stacked = self.tiles[tileNum][1]})
 
-    configs.rotation = configs.rotation or 0
-    local objCFrame = (tile.CFrame + Vector3.new(0, object.PrimaryPart.Size.Y / 2, 0)) * CFrame.Angles(0, math.rad(configs.rotation*90), 0)
-    object:SetPrimaryPartCFrame(objCFrame)
+    
+
+    clonedObj.Parent = self.Instance.Models
+
+    props.rotation = props.rotation or 0
+
+    local yFactor = clonedObj.PrimaryPart.Size.Y/2 + tile.Size.Y/2
+
+    if (clonedObj.PrimaryPart.Size.Y < 1) then
+        yFactor = clonedObj.PrimaryPart.Size.Y * 1.5
+    end
+
+    local objCFrame = (tile.CFrame + Vector3.new(0, yFactor , 0)) * CFrame.Angles(0, math.rad(props.rotation*90), 0)
+    clonedObj:SetPrimaryPartCFrame(objCFrame)
+
+    clonedObj.PrimaryPart.Anchored = true
+
+    return true
 end
 
 return Plot

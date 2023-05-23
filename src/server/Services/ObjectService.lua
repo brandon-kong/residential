@@ -2,6 +2,8 @@ local rs = game:GetService("ReplicatedStorage")
 local knit = require(rs.Packages.knit)
 local CollectionService = game:GetService("CollectionService")
 
+local Items = require(rs.Shared.Modules.Items)
+
 local ObjectService = knit.CreateService {
     Name = "ObjectService",
     Client = {},
@@ -78,7 +80,7 @@ function ObjectService:WeldObjectToPrimaryPart(object: Instance)
         return
     end
 
-    for _, part in pairs(object:GetChildren()) do
+    for _, part in pairs(object:GetDescendants()) do
         if (part:IsA("BasePart") and part ~= primaryPart) then
             local weld = Instance.new("WeldConstraint")
             weld.Part0 = primaryPart
@@ -86,6 +88,21 @@ function ObjectService:WeldObjectToPrimaryPart(object: Instance)
             weld.Parent = part
         end
     end
+end
+
+function ObjectService:TreePathToItemObject(path: string)
+    local pathToTable = string.split(path, "/")
+    local item = Items
+
+    for _, strPath in pairs(pathToTable) do
+        if (not item[strPath]) then
+            return nil
+        end
+        
+        item = item[strPath]
+    end
+
+    return item
 end
 
 function ObjectService:KnitStart()

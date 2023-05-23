@@ -99,9 +99,10 @@ end
 
 function PlaceController:KnitStart()
 
+    local objToPlace = 'Residential/House/StarterHouse'
     ContextActionService:BindAction("PlaceObject", function(actionName, inputState, inputObject)
         if (inputState == Enum.UserInputState.Begin) then
-            self:PlaceObject('Residential/House/StarterHouse')
+            self:PlaceObject(objToPlace)
         end
     end, false, Enum.KeyCode.E)
 
@@ -123,6 +124,16 @@ function PlaceController:KnitStart()
         end
     end, false, Enum.UserInputType.MouseButton1)
 
+    ContextActionService:BindAction("ShuffleObjects", function(actionName, inputState, inputObject)
+        if (inputState == Enum.UserInputState.Begin) then
+            if (objToPlace == 'Road/Basic Road') then
+                objToPlace = 'Road/Raised Road'
+            else
+                objToPlace = 'Road/Basic Road'
+            end
+        end
+    end, false, Enum.KeyCode.T)
+
 
     local PlotService = knit.GetService("PlotService")
     
@@ -131,8 +142,6 @@ function PlaceController:KnitStart()
         self._mouse:SetTargetFilter({plot.Models, plot.Debris})
         --self._mouse:SetFilterType(Enum.RaycastFilterType.Include)
     end)
-
-    self:PlaceObject("Residential/House/StarterHouse")
 
     print("PlaceController started")
 end

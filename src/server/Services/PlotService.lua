@@ -68,25 +68,29 @@ function PlotService:PlaceObject(player: Player, path: string, configs: table)
 
     if (not plot) then
         warn("Player does not have a plot")
-        return
+        return false
     end
 
     if (not configs.tile) then
         warn("No tile provided")
-        return
+        return false
     end
+
+    -- TODO: check if player has enough money
 
     local ObjectService = knit.GetService("ObjectService")
     local foundObj = ObjectService:GetObjectFromTreePath(path)
 
     if (not foundObj) then
         warn("Object not found")
-        return
+        return false
     end
 
-    local clonedObj = foundObj:Clone()
+    --local clonedObj = foundObj:Clone()
 
-    plot:PlaceObject(clonedObj, configs)
+    local didPlace = plot:PlaceObject(foundObj, configs, path)
+
+    return didPlace
 end
 
 function PlotService.Client:PlaceObject(player: Player, path: string, configs: table)
