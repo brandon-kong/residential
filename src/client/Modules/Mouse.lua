@@ -120,4 +120,12 @@ function Mouse:DisableIcon()
 	UserInputService.MouseIconEnabled = false
 end
 
+function Mouse:GetModelOfTarget()
+	local target = self:GetTarget()
+	if target then
+		return target:IsA('BasePart') and target:FindFirstAncestorWhichIsA('Model') or nil
+	end
+	return nil
+end
+
 return Mouse

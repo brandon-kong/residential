@@ -29,72 +29,76 @@ function PlotService:KnitStart()
     print("PlotService started")
 end
 
+function PlotService:AssignPlotToPlayer(player)
+    local index = 1
+    local plot = self._plots[index]
 
-function PlotService:AssignPlotToPlayer(player: Player)
-    local plot = self._plots[math.random(1, self._plotCount)]
-
-    while (plot:isOwned()) do
-        plot = self._plots[math.random(1, self._plotCount)]
-    end
-
-    plot:setOwner(player)
-end
-
-
-function PlotService:GetPlayersPlot(player: Player)
-    for _, plot in ipairs(self._plots) do
-        if (plot:isOwnedBy(player)) then
-            return plot.Instance
+    while (plot) do
+        if (not plot:isOwned()) then
+            plot:setOwner(player)
+            return plot
         end
+
+        index = index + 1
+        plot = self._plots[index]
     end
+
     return nil
 end
 
-function PlotService:GetPlayersPlotComponent(player: Player)
+function PlotService:GetPlot(player)
     for _, plot in ipairs(self._plots) do
         if (plot:isOwnedBy(player)) then
             return plot
         end
     end
+
     return nil
 end
 
-function PlotService.Client:GetPlayersPlot(player: Player)
-    return self.Server:GetPlayersPlot(player)
+function PlotService.Client:GetPlot(player)
+    return self.Server:GetPlot(player)
 end
 
-function PlotService:PlaceObject(player: Player, path: string, configs: table)
-    local plot = self:GetPlayersPlotComponent(player)
+function PlotService.Client:GetPlotInstance(player)
+    local plot = self.Server:GetPlot(player)
+    if (not plot) then return nil end
 
-    if (not plot) then
-        warn("Player does not have a plot")
-        return false
-    end
+    return plot.Instance
+end
 
-    if (not configs.tile) then
-        warn("No tile provided")
-        return false
-    end
 
-    -- TODO: check if player has enough money
+function PlotService:ConfirmPlacement(player, path, props)
+    local plot = self:GetPlot(player)
+    if (not plot) then return end
 
     local ObjectService = knit.GetService("ObjectService")
-    local foundObj = ObjectService:GetObjectFromTreePath(path)
 
-    if (not foundObj) then
+    local gottenObj = ObjectService:GetObjectFromPath(path)
+
+    if (not gottenObj) then
         warn("Object not found")
-        return false
+        return
     end
 
-    --local clonedObj = foundObj:Clone()
+    local clonedObj = gottenObj:Clone()
 
-    local didPlace = plot:PlaceObject(foundObj, configs, path)
+    local object = plot:PlaceObject(clonedObj, props, path)
+    if (not object) then clonedObj:Destroy() return end
 
-    return didPlace
+    return object
 end
 
-function PlotService.Client:PlaceObject(player: Player, path: string, configs: table)
-    self.Server:PlaceObject(player, path, configs)
+
+function PlotService.Client:ConfirmPlacement(player, path, props)
+    return self.Server:ConfirmPlacement(player, path, props)
 end
+
+
+-- just an alias
+function PlotService.Client:PlaceObject(player, path, props)
+    return self:ConfirmPlacement(player, path, props)
+end
+
 
 return PlotService

@@ -15,6 +15,7 @@ function Plot:Construct()
     self._maid = Maid.new()
     self._owner = nil
     self.tiles = {}
+    self.objects = {}
 end
 
 function Plot:Stop()
@@ -47,123 +48,128 @@ function Plot:PlaceObject(object: Instance, props: table, path: string)
     local ObjectService = knit.GetService("ObjectService")
 
     if (not ObjectService) then
-        warn("ObjectService not found")
-        return false
-    end
-    
-    local tile = props.tile
-    local tileNum = tonumber(tile.Name)
-
-    if (not tileNum) then
-        return false
+        return nil
     end
 
-    local objectFromPath = ObjectService:TreePathToItemObject(path)
-
-    if (not objectFromPath) then
-        warn('Object not found in index')
-        return false
+    local function getTileInstance(tile)
+        if (not tile) then
+            return nil
+        end
+        return tile
     end
 
-    -- if the tile is already occupied, check if stacking is allowed
+    local function getDictionaryLength(dictionary)
+        local count = 0
+        for _, _ in pairs(dictionary) do
+            count = count + 1
+        end
+        return count
+    end
 
-    if (self.tiles[tileNum]) then
-        local stacking = objectFromPath.special.stacking
+    local tile = props.Tile
+    local rotation = props.Rotation
+    local stacked = props.Stacked
 
-        if (stacking and stacking.allowed) then
-            local allowedModels = stacking.allowedModels
-            local max = stacking.max
+    local id = os.time()
 
+    if (stacked == nil) then
+        stacked = {
+            is = false,
+            id = nil,
+            obj = nil,
+        }
+    end
 
-            for _, stackedObject in pairs(self.tiles[tileNum]) do
+    local tileObject = self.tiles[tile]
 
-                if (table.find(allowedModels, stackedObject.Name)) then
-                    if (max and stackedObject.Stacked) then
-                        return false
-                    end
-                else
-                    return false
-                end
+    local objCFrame = CFrame.new()
+    local objOrientation, objSize = object:GetBoundingBox()
 
-                -- check if the connection points match
+    local y = object.PrimaryPart.Size.Y
 
+    local stackedItems = {}
 
-                local b = object:Clone()
+    if (not stacked.is) then
+        if (tileObject) then
+            -- check if the tile is already occupied
+            return nil
+        else
+        tileObject = {object}
+        self.tiles[tile] = tileObject
+        objCFrame = (getTileInstance(tile).CFrame + Vector3.new(0, y, 0)) * CFrame.Angles(0, math.rad(rotation), 0)
+        end
+    else
+        -- handle stacked objects
 
-                local yFactor = b.PrimaryPart.Size.Y/2 + tile.Size.Y/2
-
-                if (b.PrimaryPart.Size.Y < 1) then
-                    yFactor = b.PrimaryPart.Size.Y * 1.5
-                end
-
-                local objCFrame = (tile.CFrame + Vector3.new(0, yFactor, 0)) * CFrame.Angles(0, math.rad(props.rotation*90), 0)
-                b:SetPrimaryPartCFrame(objCFrame)
-
-                b.PrimaryPart.Anchored = true
-
-                local stackedObjConnectionPoints = self.tiles[tileNum][1].Instance.PrimaryPart:FindFirstChild(path)
-                local objectConnectionPoints = b.PrimaryPart:FindFirstChild(stackedObject.Name)
-
-                if (not stackedObjConnectionPoints or not objectConnectionPoints) then
-                    return false
-                end
-
-                local lenStack = #stackedObjConnectionPoints:GetChildren()
-                local lenObj = #objectConnectionPoints:GetChildren()
-
-                if (lenStack ~= lenObj) then
-                    print(lenStack, lenObj)
-                    return false
-                end
-                
-                local connectionPoints = {}
-
-                for i, v in ipairs(stackedObjConnectionPoints:GetChildren()) do
-                    for i2, v2 in ipairs(objectConnectionPoints:GetChildren()) do
-                        print((v.Position - v2.Position).Magnitude)
-                        if ((v.Position - v2.Position).Magnitude < 0.25) then
-                            table.insert(connectionPoints, v)
-                        end
-                    end
-                end
-
-                if (#connectionPoints ~= lenStack) then
-                    return false
-                end
-
+            -- check if the object is already stacked
+            if (stacked.id == object:GetAttribute("Id")) then
+                return nil
             end
 
-            -- if the object is allowed to be stacked, add it to the stack
-        else
-            return false
-        end
+            local stackedObject = self.objects[stacked.obj]
 
-        
+            if (not stackedObject) then
+                return nil
+            end
+
+            local objectToStackIndexEntry = ObjectService:GetIndexEntryFromPath(stackedObject.Path)
+
+            if (not objectToStackIndexEntry) then return nil end
+            if (not objectToStackIndexEntry.special.stacking) then return nil end
+
+            local stacking = objectToStackIndexEntry.special.stacking
+
+            if (not stacking.allowed) then return nil end
+            if (not stacking.allowedModels[path]) then return nil end
+
+            -- get the length of stacked items with the same class
+            local a = 0
+            for _, b in pairs(stackedObject.StackedItems) do
+                if (b.Path == path) then
+                    a = a + 1
+                end
+            end
+
+            local max = stacking.allowedModels[path].max or 1
+            if (a >= max) then return nil end
+
+            -- check if connection points are taken
+            for _, connectionPoint in ipairs(stackedObject.StackedItems) do
+                if (connectionPoint.ConnectionPoint == stacked.connectionPoint) then
+                    return nil
+                end
+            end
+
+            local connectionPoint  = stacked.connectionPoint
+            local connectionPointCFrame = connectionPoint.CFrame
+
+            objCFrame = (connectionPointCFrame * CFrame.Angles(0, math.rad(rotation), 0))
+
+            self.objects[stacked.obj].StackedItems[id] = {
+                Path = path,
+                Rotation = rotation,
+                Tile = tile,
+                Stacked = stacked,
+                Instance = object,
+                ConnectionPoint = tonumber(connectionPoint.Name),
+                StackedItems = {}
+            }
     end
 
-    local clonedObj = object:Clone()
+    self.objects[object] = {
+        Path = path,
+        Rotation = rotation,
+        Tile = tile,
+        Stacked = stacked,
+        Instance = object,
+        StackedItems = {}
+    }
 
-    self.tiles[tileNum] = self.tiles[tileNum] or {}
-    table.insert(self.tiles[tileNum], {Name = path, Instance = clonedObj, Stacked = self.tiles[tileNum][1]})
+    object.Parent = self.Instance.Models
+    object:SetAttribute("Id", id)
+    object:PivotTo(objCFrame)
 
-    
-
-    clonedObj.Parent = self.Instance.Models
-
-    props.rotation = props.rotation or 0
-
-    local yFactor = clonedObj.PrimaryPart.Size.Y/2 + tile.Size.Y/2
-
-    if (clonedObj.PrimaryPart.Size.Y < 1) then
-        yFactor = clonedObj.PrimaryPart.Size.Y * 1.5
-    end
-
-    local objCFrame = (tile.CFrame + Vector3.new(0, yFactor , 0)) * CFrame.Angles(0, math.rad(props.rotation*90), 0)
-    clonedObj:SetPrimaryPartCFrame(objCFrame)
-
-    clonedObj.PrimaryPart.Anchored = true
-
-    return true
+    return object
 end
 
 return Plot

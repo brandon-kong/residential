@@ -1,6 +1,7 @@
 local rs = game:GetService("ReplicatedStorage")
 local knit = require(rs.Packages.knit)
 local CollectionService = game:GetService("CollectionService")
+local container = rs.Container
 
 local Items = require(rs.Shared.Modules.Items)
 
@@ -9,104 +10,129 @@ local ObjectService = knit.CreateService {
     Client = {},
 }
 
+
 function ObjectService:KnitInit()
-    self._objects = {}
 
-    print("Tagging objects...")
+    self.objects = {}
 
-    self:TagAllModelsInTree(rs.Container, "Object")
-
-    for _, object in pairs(CollectionService:GetTagged("Object")) do
-        local objectTree = self:SerializeObjectTree(object)
-        self._objects[objectTree] = object
+    local function initCallback(action, callback)
+        print('Initializing callback for action: ' .. action)
+        callback()
+        print('Callback initialized for action: ' .. action)
     end
 
-    print("Welding objects...")
+    initCallback('Welding', function()
+        for _, model in ipairs(container:GetDescendants()) do
+            if (model:IsA("Model")) then
+                self:WeldModelToPrimaryPart(model)
+            end
+        end
+    end)
 
-    for _, object in pairs(CollectionService:GetTagged("Object")) do
-        self:WeldObjectToPrimaryPart(object)
-    end
+    initCallback('Paths', function()
+        self:InitializePathsInContainer()
+    end)
 
     print("ObjectService initialized")
 end
 
-function ObjectService:SerializeObjectTree(object: Instance)
-    -- Creates a formatted string that represents the object tree
-    -- ex: Residential/House/StarterHouse
 
-    local objectTree = object.Name
-
-    if (object.Parent.Name == 'Container') then
-        return objectTree
-    end
-
-    if (object.Parent) then
-        objectTree = self:SerializeObjectTree(object.Parent) .. "/" .. objectTree
-    end
-
-    return objectTree
+function ObjectService:KnitStart()
+    print("ObjectService started")
 end
 
-function ObjectService:TagAllModelsInTree(object: Instance, tag: string)
-    -- Tags all models in the object tree with the Object tag
-    -- ex: Residential/House/StarterHouse
 
-    if (object:IsA("Model")) then
-        CollectionService:AddTag(object, "Object")
-        return
-    end
+function ObjectService:WeldModelToPrimaryPart(model: Model)
+    local primaryPart = model.PrimaryPart
+    if (not primaryPart) then return end
 
-    for _, child in pairs(object:GetChildren()) do
-        self:TagAllModelsInTree(child)
-    end
-end
-
-function ObjectService:GetObjectFromTreePath(treePath: string)
-    return self._objects[treePath]
-end
-
-function ObjectService.Client:GetObjectFromTreePath(player: Instance, treePath: string)
-    return self.Server:GetObjectFromTreePath(treePath)
-end
-
-function ObjectService:WeldObjectToPrimaryPart(object: Instance)
-    -- Welds all parts in the object to the primary part
-    -- ex: Residential/House/StarterHouse
-
-    local primaryPart = object.PrimaryPart
-
-    if (not primaryPart) then
-        warn("Object does not have a primary part")
-        return
-    end
-
-    for _, part in pairs(object:GetDescendants()) do
-        if (part:IsA("BasePart") and part ~= primaryPart) then
+    for _, part in ipairs(model:GetDescendants()) do
+        if (part:IsA("BasePart")) then
+            part.Anchored = false
             local weld = Instance.new("WeldConstraint")
             weld.Part0 = primaryPart
             weld.Part1 = part
             weld.Parent = part
         end
     end
+
+    primaryPart.Anchored = true
 end
 
-function ObjectService:TreePathToItemObject(path: string)
-    local pathToTable = string.split(path, "/")
-    local item = Items
 
-    for _, strPath in pairs(pathToTable) do
-        if (not item[strPath]) then
-            return nil
-        end
-        
-        item = item[strPath]
+function ObjectService:GeneratePath(object: Instance)
+    --[[
+        Recursive function that generates a path to an object in the container.
+    ]]
+
+    if (object == container) then
+        return
     end
 
-    return item
+    if (not object) then
+        return
+    end
+
+    local path = object.Name
+
+    if (object.Parent == container) then
+        return path
+    end
+
+    return self:GeneratePath(object.Parent) .. '/' .. path
 end
 
-function ObjectService:KnitStart()
-    print("ObjectService started")
+
+function ObjectService:InitializePathsInContainer()
+    for _, object in ipairs(container:GetDescendants()) do
+        if (object:IsA("Model") and object.PrimaryPart) then
+            local path = self:GeneratePath(object)
+            if (not self:ItemIsInIndex(path)) then
+                warn('Item not in index: ' .. path)
+                continue
+            end
+
+            self.objects[path] = object
+            object:SetAttribute("Path", path)
+        end
+    end
+end
+
+
+function ObjectService:ItemIsInIndex(path: string)
+    local a = path:split('/')
+    local b = Items
+
+    for _, v in ipairs(a) do
+        if (not b[v]) then
+            return false
+        end
+
+        b = b[v]
+    end
+
+    return true
+end
+
+
+function ObjectService:GetIndexEntryFromPath(path: string)
+    local a = path:split('/')
+    local b = Items
+
+    for _, v in ipairs(a) do
+        if (not b[v]) then
+            return nil
+        end
+
+        b = b[v]
+    end
+
+    return b
+end
+
+
+function ObjectService:GetObjectFromPath(path: string)
+    return self.objects[path]
 end
 
 return ObjectService
