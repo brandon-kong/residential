@@ -206,8 +206,6 @@ function PlaceController:KnitStart()
     })
 
     self.state.plot = plot
-
-    self:PlaceObject("Road/Raised Road")
 end
 
 function PlaceController:PlaceObject(path: string)

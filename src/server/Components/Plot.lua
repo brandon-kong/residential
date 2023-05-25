@@ -22,6 +22,13 @@ local Plot = Component.new({
     Constraints are added to the object that is stacking on top of the other object
 ]]
 
+function getDictionaryLength(dict)
+    local a = 0
+    for _, _ in pairs(dict) do
+        a = a + 1
+    end
+    return a
+end
 
 function Plot:Construct()
     self._maid = Maid.new()
@@ -370,27 +377,53 @@ function Plot:MoveObjectHandler(object: Instance, props: table, path: string)
 
     -- weld previous stacked items to the new object
 
-    local connectionPointsFolder = object.PrimaryPart["ConnectionPoints"]
-    if (not connectionPointsFolder) then return end
+    if (getDictionaryLength(self.objects[id].StackedItems) > 0) then
+        local connectionPointsFolder = object.PrimaryPart["ConnectionPoints"]
+        if (not connectionPointsFolder) then return end
 
-    for i, v in pairs(self.objects[id].StackedItems) do
-        local folderOfPath = connectionPointsFolder:FindFirstChild(tostring(v.Path))
-        if (not folderOfPath) then continue end
+        for i, v in pairs(self.objects[id].StackedItems) do
+            local folderOfPath = connectionPointsFolder:FindFirstChild(tostring(v.Path))
+            if (not folderOfPath) then continue end
 
-        local connectionPointInstance = folderOfPath:FindFirstChild(tostring(v.ConnectionPoint))
-        if (not connectionPointInstance) then continue end
+            local connectionPointInstance = folderOfPath:FindFirstChild(tostring(v.ConnectionPoint))
+            if (not connectionPointInstance) then continue end
 
-        for x, z in ipairs(v.Instance.PrimaryPart.StackedConstraints:GetChildren()) do
-            z:Destroy()
+            for x, z in ipairs(v.Instance.PrimaryPart.StackedConstraints:GetChildren()) do
+                z:Destroy()
+            end
+
+            v.Instance:PivotTo(connectionPointInstance.CFrame)
+            self:WeldObjectToConnectionPoint(v.Instance, connectionPointInstance)
+            --v.Instance.PrimaryPart.Anchored = false
+            --self:RecursivelyWeldStack(v.Instance)
         end
-
-        v.Instance:PivotTo(connectionPointInstance.CFrame)
-        self:WeldObjectToConnectionPoint(v.Instance, connectionPointInstance)
-        --v.Instance.PrimaryPart.Anchored = false
-        --self:RecursivelyWeldStack(v.Instance)
     end
+
+    -- TODO: recursively update the stacked items' tile
+    self:UpdateItemInStack(object, {
+        Tile = tile
+    })
 end
 
+
+function Plot:UpdateItemInStack(object, table)
+    if (not object) then return end
+    if (not table) then return end
+
+    local id = object:GetAttribute("Id")
+
+    if (not id) then return end
+
+    if (not self.objects[id]) then return end
+
+    for key, value in pairs(table) do
+        self.objects[id][key] = value
+    end
+
+    for _, stackedItem in pairs(self.objects[id].StackedItems) do
+        self:UpdateItemInStack(stackedItem.Instance, table)
+    end
+end
 
 function Plot:GetStackedObjectsOnInstance(object: Instance)
     if (not object) then return {} end
