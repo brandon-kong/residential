@@ -54,6 +54,21 @@ function PlaceController:KnitInit()
         end
     end, false, Enum.KeyCode.E)
 
+    ContextActionService:BindAction("MoveObject", function(actionName, inputState, inputObject)
+        if (inputState == Enum.UserInputState.Begin) then
+            local target = self.mouse:GetTarget()
+
+            if (target) then
+                local targetModel = placeUtil.GetModelFromPart(target)
+                if (targetModel) then
+                    if (placeUtil.ModelIsInPlot(targetModel, self.state.plot)) then
+                        self:MoveObject(targetModel)
+                    end
+                end
+            end
+        end
+    end, false, Enum.KeyCode.M)
+
     ContextActionService:BindAction("ConfirmPlacement", function(actionName, inputState, inputObject)
         if (inputState == Enum.UserInputState.Begin) then
             self:ConfirmPlacement()
@@ -78,7 +93,7 @@ function PlaceController:KnitInit()
         if (inputState == Enum.UserInputState.Begin) then
             self:CancelPlacement()
         end
-    end, false, Enum.KeyCode.Q)
+    end, false, Enum.KeyCode.C)
 
 
 end
@@ -187,7 +202,7 @@ function PlaceController:KnitStart()
 
     self.mouse:SetFilterType(Enum.RaycastFilterType.Exclude)
     self.mouse:SetTargetFilter({
-        plot.Debris
+        plot.Debris,
     })
 
     self.state.plot = plot
@@ -216,6 +231,31 @@ function PlaceController:PlaceObject(path: string)
 end
 
 
+function PlaceController:MoveObject(object: Instance)
+    if (self.state.placing) then return end
+    if (self.state.moving) then return end
+    if (not self.state.plot) then return end
+    if (not object) then return end
+
+    local state = self.state
+
+    local plot = state.plot
+
+    state.object = object
+    state.moving = true
+    state.object.PrimaryPart.Anchored = true
+    state.path = object:GetAttribute("Path")
+
+    placeUtil.SetTransparency(object, 0.5)
+    placeUtil.SetCollisionGroup(object, "Plot")
+
+    self.mouse:SetTargetFilter({
+        plot.Debris,
+        object
+    })
+end
+
+
 function PlaceController:RotateObject()
     local state = self.state
     local object = state.object
@@ -228,6 +268,7 @@ end
 
 
 function PlaceController:ConfirmPlacement()
+    if (not self.state.placing and not self.state.moving) then return end
     local state = self.state
 
     local object = state.object
@@ -239,18 +280,36 @@ function PlaceController:ConfirmPlacement()
 
     local PlotService = knit.GetService("PlotService")
     
+    if (state.moving) then
+        PlotService:MoveObject(object, {
+            Stacked = stacked,
+            Path = path,
+            Rotation = rotation,
+            Tile = tile
+        }):andThen(function()
+            self:CancelMove()
+        end):catch(warn)
+        --self:CancelMove()
+        return
+    end
     PlotService:PlaceObject(path, {
         Stacked = stacked,
         Path = path,
         Rotation = rotation,
         Tile = tile
-    }, plot):andThen(function()
+    }):andThen(function()
         --self:CancelPlacement()
     end)
 end
 
 
 function PlaceController:CancelPlacement()
+
+    if (not self.state.placing and not self.state.moving) then return end
+    if (self.state.moving) then
+        self:CancelMove()
+        return
+    end
     local state = self.state
 
     local object = state.object
@@ -260,6 +319,25 @@ function PlaceController:CancelPlacement()
     end
 
     state.placing = false
+    state.moving = false
+    state.object = nil
+    state.path = nil
+    state.props = nil
+    state.stacked = {
+        is = false,
+        connectionPoint = nil,
+    }
+    state.tile = nil
+    state.rotation = 0
+end
+
+
+function PlaceController:CancelMove()
+    local state = self.state
+
+    local object = state.object
+
+    state.moving = false
     state.object = nil
     state.path = nil
     state.props = nil

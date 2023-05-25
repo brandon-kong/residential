@@ -101,4 +101,23 @@ function PlotService.Client:PlaceObject(player, path, props)
 end
 
 
+function PlotService:MoveObject(player, object, props)
+    if (not object) then return end
+
+    local plot = self:GetPlot(player)
+    local path = object:GetAttribute("Path")
+
+    if (not path) then return end
+    if (not plot) then return end
+
+    local movedObj = plot:MoveObject(object, props, path)
+
+    return movedObj
+end
+
+
+function PlotService.Client:MoveObject(player, object, props)
+    return self.Server:MoveObject(player, object, props)
+end
+
 return PlotService

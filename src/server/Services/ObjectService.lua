@@ -47,7 +47,7 @@ function ObjectService:WeldModelToPrimaryPart(model: Model)
     if (not primaryPart) then return end
 
     for _, part in ipairs(model:GetDescendants()) do
-        if (part:IsA("BasePart")) then
+        if (part:IsA("BasePart")) and (model.PrimaryPart ~= part) then
             part.Anchored = false
             local weld = Instance.new("WeldConstraint")
             weld.Part0 = primaryPart
@@ -55,6 +55,10 @@ function ObjectService:WeldModelToPrimaryPart(model: Model)
             weld.Parent = part
         end
     end
+
+    local stackedConstraints = Instance.new("Folder")
+    stackedConstraints.Name = "StackedConstraints"
+    stackedConstraints.Parent = primaryPart
 
     primaryPart.Anchored = true
 end
@@ -116,6 +120,8 @@ end
 
 
 function ObjectService:GetIndexEntryFromPath(path: string)
+    if (not path) then return nil end
+    
     local a = path:split('/')
     local b = Items
 
