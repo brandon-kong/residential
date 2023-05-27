@@ -22,11 +22,14 @@ function PlaceController:KnitInit()
         path = nil,
         plot = nil,
         tile = nil,
+        allowedRotations = nil,
+        allowedRotationIndex = 1,
         stacked = {
             is = false,
             connectionPoint = nil,
         },
         rotation = 0,
+        rotationTemp = 0,
     }
 
     local shuffle = {
@@ -137,10 +140,31 @@ function PlaceController:Render(dt)
                             -- calculate rotation of object based on the closest connection point rotation
                             --object:PivotTo(closestConnectionPoint.CFrame * CFrame.Angles(0, math.rad(state.rotation), 0))
 
-                            local objectPosition = closestConnectionPoint.CFrame
+                            
+                            --TODO: check if the object is oriented correctly
+                            if targetModelStacking.allowedModels[path].orientationStrict then
+                                if (targetModel.PrimaryPart:FindFirstChild("AllowedSnapping") and targetModel.PrimaryPart.AllowedSnapping:FindFirstChild(path)) then
+                                    if (object.PrimaryPart:FindFirstChild("AllowedSnapping") and object.PrimaryPart.AllowedSnapping:FindFirstChild(targetModelPath)) then
+
+                                        local allowedRotations = placeUtil.RotationIsValid(targetModelPath, path, targetModel, object, closestConnectionPoint)
+                                        if (allowedRotations) then
+                                            self.state.allowedRotations = allowedRotations
+                                            if (not table.find(allowedRotations, state.rotation)) then
+                                                state.rotation = allowedRotations[1]
+                                            end
+                                        end
+                                    end
+                                end
+
+                            end
+
+                            
+
+                            local objectPosition = closestConnectionPoint.CFrame.Position
+                            local newCframe = CFrame.new(objectPosition) * CFrame.Angles(0, math.rad(state.rotation), 0)
 
                             TweenService:Create(object.PrimaryPart, TweenInfo.new(0.1), {
-                                CFrame = objectPosition * CFrame.Angles(0, math.rad(state.rotation), 0)
+                                CFrame = newCframe
                             }):Play()
 
                             state.stacked = {
@@ -160,6 +184,9 @@ function PlaceController:Render(dt)
     local targetTile = placeUtil.GetNearestTileFromMousePosition(mouse, plot.Tiles:GetChildren())
 
     if (targetTile) then
+
+        state.allowedRotations = nil
+        state.allowedRotationIndex = 1
 
         state.stacked = {
             is = false,
@@ -235,18 +262,34 @@ function PlaceController:MoveObject(object: Instance)
     if (not self.state.plot) then return end
     if (not object) then return end
 
+    local PlotService = knit.GetService("PlotService")
+
+    if (not PlotService) then
+        return
+    end
+
     local state = self.state
-
     local plot = state.plot
+    
+    local function init()
+        state.object = object
+        state.moving = true
+        state.object.PrimaryPart.Anchored = true
+        state.path = object:GetAttribute("Path")
 
-    state.object = object
-    state.moving = true
-    state.object.PrimaryPart.Anchored = true
-    state.path = object:GetAttribute("Path")
+        placeUtil.SetTransparency(object, 0.5)
+        placeUtil.SetCollisionGroup(object, "Plot")
 
-    placeUtil.SetTransparency(object, 0.5)
-    placeUtil.SetCollisionGroup(object, "Plot")
+        for _, v in ipairs(object.PrimaryPart.StackedConstraints:GetChildren()) do
+            v.Enabled = false
+        end
+    end
 
+    PlotService:GetRotation(object):andThen(function(rotation)
+        state.rotation = rotation
+        init()
+    end):catch(warn)
+    
     self.mouse:SetTargetFilter({
         plot.Debris,
         object
@@ -257,6 +300,16 @@ end
 function PlaceController:RotateObject()
     local state = self.state
     local object = state.object
+
+    if (state.allowedRotations) then
+        if (state.allowedRotationIndex >= #state.allowedRotations) then
+            state.allowedRotationIndex = 1
+        else
+            state.allowedRotationIndex = state.allowedRotationIndex + 1
+        end
+        state.rotation = state.allowedRotations[state.allowedRotationIndex]
+        return
+    end
 
     state.rotation = state.rotation + 90
     if (state.rotation >= 360) then
@@ -325,6 +378,8 @@ function PlaceController:CancelPlacement()
         is = false,
         connectionPoint = nil,
     }
+    state.allowedRotations = nil
+    state.allowedRotationIndex = 1
     state.tile = nil
     state.rotation = 0
 end
@@ -343,6 +398,8 @@ function PlaceController:CancelMove()
         is = false,
         connectionPoint = nil,
     }
+    state.allowedRotations = nil
+    state.allowedRotationIndex = 1
     state.tile = nil
     state.rotation = 0
 end

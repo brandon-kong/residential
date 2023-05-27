@@ -104,20 +104,64 @@ end
 function PlotService:MoveObject(player, object, props)
     if (not object) then return end
 
+    local id = object:GetAttribute("Id")
     local plot = self:GetPlot(player)
     local path = object:GetAttribute("Path")
 
+    local b = object:Clone()
+
     if (not path) then return end
     if (not plot) then return end
+    if (not id) then return end
 
     local movedObj = plot:MoveObject(object, props, path)
 
+    if (not movedObj) then
+        local currentObj = plot:GetObjectFromId(id)
+
+        if (not currentObj) then return end
+
+        -- return the object to its original position
+        local newProps = {
+            Rotation = currentObj.Rotation,
+            Tile = currentObj.Tile,
+            Stacked = currentObj.Stacked,
+            Id = currentObj.Id,
+        }
+
+        plot:PlaceObject(b, newProps, path)
+    else
+        b:Destroy()
+    end
     return movedObj
 end
 
 
 function PlotService.Client:MoveObject(player, object, props)
     return self.Server:MoveObject(player, object, props)
+end
+
+
+function PlotService:GetRotation(player, object)
+    if (not object) then return end
+
+    local id = object:GetAttribute("Id")
+    local plot = self:GetPlot(player)
+    local path = object:GetAttribute("Path")
+
+    if (not path) then return end
+    if (not plot) then return end
+    if (not id) then return end
+
+    local currentObj = plot:GetObjectFromId(id)
+
+    if (not currentObj) then return end
+
+    return currentObj.Rotation
+end
+
+function PlotService.Client:GetRotation(player, object)
+    return self.Server:GetRotation(player, object)
 end
 
 return PlotService

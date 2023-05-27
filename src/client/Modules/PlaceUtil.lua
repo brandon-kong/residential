@@ -176,4 +176,81 @@ function PlaceUtil.GetConnectionPointsClosestToMouse(mouse, model: Model, pathTo
     return closestConnectionPoint
 end
 
+function PlaceUtil.RotationIsValid(path1, path2, object1, object2, connectionPoint)
+    --1 is the model that is already placed
+    --2 is the model that is being placed
+
+    local indexEntry1 = PlaceUtil.GetIndexEntryFromPath(path1)
+    local indexEntry2 = PlaceUtil.GetIndexEntryFromPath(path2)
+
+    if (not indexEntry1) then
+        return nil
+    end
+
+    if (not indexEntry2) then
+        return nil
+    end
+
+    local allowedRotations = {}
+
+    local b = object2:Clone()
+
+    local allowedModel = indexEntry1.special.stacking.allowedModels[path2]
+
+    if (not allowedModel) then
+        return nil
+    end
+
+    local allowedSnapping1 = object1.PrimaryPart:FindFirstChild("AllowedSnapping")
+    local allowedSnapping2 = b.PrimaryPart:FindFirstChild("AllowedSnapping")
+
+    if (not allowedSnapping1) then
+        return nil
+    end
+
+    if (not allowedSnapping2) then
+        return nil
+    end
+
+    local snappingFolder1 = allowedSnapping1:FindFirstChild(path2)
+    local snappingFolder2 = allowedSnapping2:FindFirstChild(path1)
+
+    if (not snappingFolder1) then
+        return nil
+    end
+
+    if (not snappingFolder2) then
+        return nil
+    end
+
+    if (not allowedModel.orientationStrict) then
+        return {0, 90, 180, 270}
+    end
+
+    local min = math.min(#snappingFolder1:GetChildren(), #snappingFolder2:GetChildren())
+
+    for i = 0, 3 do
+        local rotation = i * 90
+
+        b:PivotTo(CFrame.new(connectionPoint.CFrame.Position) * CFrame.Angles(0, math.rad(rotation), 0))
+
+        local c = 0
+
+        for _, x in ipairs(snappingFolder2:GetChildren()) do
+            for a, v in ipairs(snappingFolder1:GetChildren()) do
+                if ((v.Position - x.Position).magnitude < 0.1) then
+                    c += 1
+                end
+            end
+        end
+
+        if (c >= min) then
+            
+            table.insert(allowedRotations, rotation)
+        end
+    end
+
+    return allowedRotations
+end
+
 return PlaceUtil

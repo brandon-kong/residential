@@ -43,6 +43,7 @@ return {
                     allowedModels = {
                         ['Road/Raised Road'] = {
                             max = 1,
+                            orientationStrict = true,
                         },
                         ['Road/Streetlight'] = {
                             max = 2,
@@ -63,9 +64,6 @@ return {
                     allowed = true,
                     max = 2,
                     allowedModels = {
-                        ['Road/Raised Road'] = {
-                            max = 1,
-                        },
                         ['Road/Streetlight'] = {
                             max = 2,
                         }

@@ -102,7 +102,9 @@ function Plot:PlaceObject(object: Instance, props: table, path: string)
             -- check if the tile is already occupied
             return nil
         else
+        self.tiles[tile] = {}
         tileObject = {object}
+        table.insert(self.tiles[tile], object)
         self.tiles[tile] = tileObject
         objCFrame = (getTileInstance(tile).CFrame + Vector3.new(0, y, 0)) * CFrame.Angles(0, math.rad(rotation), 0)
         end
@@ -154,7 +156,7 @@ function Plot:PlaceObject(object: Instance, props: table, path: string)
             local connectionPoint  = stacked.connectionPoint
             local connectionPointCFrame = connectionPoint.CFrame
 
-            objCFrame = (connectionPointCFrame * CFrame.Angles(0, math.rad(rotation), 0))
+            objCFrame = CFrame.new(connectionPointCFrame.Position) * CFrame.Angles(0, math.rad(rotation), 0)
 
             self.objects[stacked.id].StackedItems[id] = {
                 Path = path,
@@ -203,7 +205,6 @@ function Plot:RemoveObject(object: Instance)
     if (not self.objects[object]) then return end
 
     for _, stackedItem in ipairs(self.objects[object].StackedItems) do
-        print(stackedItem)
         self:RemoveObject(stackedItem.Instance)
     end
 
@@ -233,7 +234,6 @@ function Plot:MoveObject(object: Instance, props: table, path: string)
 
     -- place the object again
     self:MoveObjectHandler(b, props, path)
-    print(self.objects)
 end
 
 
@@ -280,16 +280,28 @@ function Plot:MoveObjectHandler(object: Instance, props: table, path: string)
         if (oldStackedObject) then
             oldStackedObject.StackedItems[id] = nil
         end
+
+        if (not oldStacked.is) then
+            -- get the tile that the object is stacked on
+            local btile = oldObject.Tile
+            self.tiles[btile] = nil
+        end
     end
 
     local tileObject = self.tiles[tile]
 
     if (not isStacked) then
-        tileObject = {}
-        self.tiles[tile] = {tileObject}
-        objCFrame = (getTileInstance(tile).CFrame + Vector3.new(0, y, 0)) * CFrame.Angles(0, math.rad(rotation), 0)
+        if (tileObject) then
+            -- check if the tile is already occupied
+            return nil
+        else
+            tileObject = tileObject or {}
+            self.tiles[tile] = {}
+            table.insert(self.tiles[tile], object)
+            objCFrame = (getTileInstance(tile).CFrame + Vector3.new(0, y, 0)) * CFrame.Angles(0, math.rad(rotation), 0)
 
-        object.PrimaryPart.Anchored = true
+            object.PrimaryPart.Anchored = true
+        end
     else
         -- check if the object is already stacked
         if (stacked.id == object:GetAttribute("Id")) then
@@ -333,7 +345,7 @@ function Plot:MoveObjectHandler(object: Instance, props: table, path: string)
         local connectionPoint  = stacked.connectionPoint
         local connectionPointCFrame = connectionPoint.CFrame
 
-        objCFrame = (connectionPointCFrame * CFrame.Angles(0, math.rad(rotation), 0))
+        objCFrame = (CFrame.new(connectionPointCFrame.Position) * CFrame.Angles(0, math.rad(rotation), 0))
 
         self.objects[stacked.id].StackedItems[id] = {
             Path = path,
@@ -392,7 +404,7 @@ function Plot:MoveObjectHandler(object: Instance, props: table, path: string)
                 z:Destroy()
             end
 
-            v.Instance:PivotTo(connectionPointInstance.CFrame)
+            v.Instance:PivotTo(CFrame.new(connectionPointInstance.CFrame.Position) * CFrame.Angles(0, math.rad(v.Rotation), 0))
             self:WeldObjectToConnectionPoint(v.Instance, connectionPointInstance)
             --v.Instance.PrimaryPart.Anchored = false
             --self:RecursivelyWeldStack(v.Instance)
@@ -468,7 +480,7 @@ function Plot:RecursivelyWeldStack(object)
         if (not connectionPointInstance) then continue end
 
         self:WeldObjectToConnectionPoint(stackedItem.Instance, connectionPointInstance)
-        stackedItem.Instance:PivotTo(connectionPointInstance.CFrame)
+        stackedItem.Instance:PivotTo(CFrame.new(connectionPointInstance.CFrame.Position) * CFrame.Angles(0, math.rad(stackedItem.Rotation), 0))
         self:RecursivelyWeldStack(stackedItem.Instance)
     end
 end
@@ -511,6 +523,33 @@ function Plot:GetNewUniqueId()
     end
 
     return id
+end
+
+
+function Plot:GetObjectFromId(id: number)
+    if (not id) then return nil end
+
+    return self.objects[id]
+end
+
+
+function Plot:GetStackFromObject(object: Instance)
+    if (not object) then return nil end
+
+    local id = object:GetAttribute("Id")
+
+    if (not id) then return nil end
+
+    local a = {}
+
+    while (object and self.objects[id]) do
+        local object = self.objects[id].Instance
+        table.insert(a, object)
+        object = self.objects[id].Stacked.obj
+        id = object:GetAttribute("Id")
+    end
+
+    return self.objects[id].Stacked
 end
 
 return Plot
