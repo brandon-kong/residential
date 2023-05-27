@@ -44,6 +44,7 @@ return {
                         ['Road/Raised Road'] = {
                             max = 1,
                             orientationStrict = true,
+                            minSnaps = 2,
                         },
                         ['Road/Streetlight'] = {
                             max = 2,
@@ -66,7 +67,12 @@ return {
                     allowedModels = {
                         ['Road/Streetlight'] = {
                             max = 2,
-                        }
+                        },
+                        ['Road/Raised Road'] = {
+                            max = 1,
+                            orientationStrict = true,
+                            minSnaps = 2,
+                        },
                     }
                 }
             }

@@ -146,8 +146,9 @@ function PlaceController:Render(dt)
                                 if (targetModel.PrimaryPart:FindFirstChild("AllowedSnapping") and targetModel.PrimaryPart.AllowedSnapping:FindFirstChild(path)) then
                                     if (object.PrimaryPart:FindFirstChild("AllowedSnapping") and object.PrimaryPart.AllowedSnapping:FindFirstChild(targetModelPath)) then
 
-                                        local allowedRotations = placeUtil.RotationIsValid(targetModelPath, path, targetModel, object, closestConnectionPoint)
-                                        if (allowedRotations) then
+                                        local minSnaps = targetModelStacking.allowedModels[path].minSnaps
+                                        local allowedRotations = placeUtil.RotationIsValid(targetModelPath, path, targetModel, object, closestConnectionPoint, minSnaps)
+                                        if (allowedRotations and #allowedRotations > 0) then
                                             self.state.allowedRotations = allowedRotations
                                             if (not table.find(allowedRotations, state.rotation)) then
                                                 state.rotation = allowedRotations[1]
@@ -157,8 +158,6 @@ function PlaceController:Render(dt)
                                 end
 
                             end
-
-                            
 
                             local objectPosition = closestConnectionPoint.CFrame.Position
                             local newCframe = CFrame.new(objectPosition) * CFrame.Angles(0, math.rad(state.rotation), 0)

@@ -176,7 +176,7 @@ function PlaceUtil.GetConnectionPointsClosestToMouse(mouse, model: Model, pathTo
     return closestConnectionPoint
 end
 
-function PlaceUtil.RotationIsValid(path1, path2, object1, object2, connectionPoint)
+function PlaceUtil.RotationIsValid(path1, path2, object1, object2, connectionPoint, minSnaps)
     --1 is the model that is already placed
     --2 is the model that is being placed
 
@@ -227,7 +227,7 @@ function PlaceUtil.RotationIsValid(path1, path2, object1, object2, connectionPoi
         return {0, 90, 180, 270}
     end
 
-    local min = math.min(#snappingFolder1:GetChildren(), #snappingFolder2:GetChildren())
+    local min = minSnaps or math.min(#snappingFolder1:GetChildren(), #snappingFolder2:GetChildren())
 
     for i = 0, 3 do
         local rotation = i * 90
@@ -244,7 +244,7 @@ function PlaceUtil.RotationIsValid(path1, path2, object1, object2, connectionPoi
             end
         end
 
-        if (c >= min) then
+        if (c >= minSnaps) then
             
             table.insert(allowedRotations, rotation)
         end
